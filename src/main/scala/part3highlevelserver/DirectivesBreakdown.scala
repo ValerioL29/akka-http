@@ -8,10 +8,11 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, StatusCodes}
 import akka.stream.{Materializer, SystemMaterializer}
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{Route, StandardRoute}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.io.StdIn
+import scala.language.postfixOps
 import scala.util.Try
 
 object DirectivesBreakdown {
@@ -98,14 +99,76 @@ object DirectivesBreakdown {
     }
 
   /**
-   * Type #
+   * Type #3: composite directives
    *
    */
+  val simpleNestedRoute: Route =
+    path("api" / "item") {
+      get {
+        complete(StatusCodes.OK)
+      }
+    }
+
+  val compactSimpleNestedRoute: Route = (path("api" / "item") & get) {
+    complete(StatusCodes.OK)
+  }
+
+  val compactExtractRequestRoute: Route = (path("controlEndpoint") & extractRequest & extractLog) {
+    (request: HttpRequest, log: LoggingAdapter) => {
+      log.info(s"I got the http request: $request")
+      complete(StatusCodes.OK)
+    }
+  }
+
+  // GET /about and /aboutUs
+  val repeatedRoute: Route = (path("about") | path("aboutUs")) {
+    complete(StatusCodes.OK)
+  }
+
+  // Support following endpoint: blog.com/42 AND blog.com/?postId=42
+  val blogByIdRoute: Route =
+    (path(IntNumber) | parameter(Symbol("postId").as[Int])) { blogPostId: Int =>
+      // your original server logic
+      println(s"I received a blog post id: $blogPostId")
+      complete(StatusCodes.OK)
+    }
+
+  /**
+   * Type #4: "actionable" directives
+   *
+   */
+  val completeOkRoute: StandardRoute = complete(StatusCodes.OK)
+
+  val failedRoute: Route =
+    path("notSupported") {
+      failWith(new RuntimeException("Unsupported")) // completes with HTTP 500
+    }
+
+  val routeWithRejection: Route =
+    path("home") {
+      reject
+    } ~
+    path("index") {
+      completeOkRoute
+    }
+
+
+  // Tiny exercise:
+  val getOrPutPath: Route =
+    path("api" / "exercise") {
+      get {
+        completeOkRoute
+      } ~
+      put {
+        complete(StatusCodes.Forbidden)
+      }
+    }
+
 
   def main(args: Array[String]): Unit = {
     val serverBindingFuture: Future[Http.ServerBinding] =
       Http().newServerAt("localhost", 8080)
-        .bind(extractRequestRoute)
+        .bind(getOrPutPath)
 
     println("The server has been bound at http://localhost:8080/\n" +
       "Press Enter to close.")
