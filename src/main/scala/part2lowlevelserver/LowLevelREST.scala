@@ -31,6 +31,7 @@ object Messages {
   case class FindGuitar(id: String, replyTo: ActorRef[Response]) extends Command
   case class FindAllGuitar(replyTo: ActorRef[Response]) extends Command
   case class AddQuantity(id: String, num: Int, replyTo: ActorRef[Response]) extends Command
+  case class FindGuitarsInStock(inStock: Boolean, replyTo: ActorRef[Response]) extends Command
 
   sealed trait Response
   case class GuitarCreated(id: String) extends Response
@@ -38,6 +39,10 @@ object Messages {
   case class FoundAllGuitar(guitars: List[Guitar]) extends Response
   case object NoSuchGuitar extends Response
   case class QuantityAdded(newStock: Int) extends Response
+  case class GuitarsInOrOutOfStock(guitars: List[Guitar]) extends Response
+
+  trait RootCommand
+  case class RetrieveDBActor(replyTo: ActorRef[ActorRef[Command]]) extends RootCommand
 }
 
 object GuitarDB {
@@ -84,7 +89,17 @@ object GuitarDB {
               replyTo ! QuantityAdded(newStocks)
               active(guitars + (id -> Guitar(guitar.maker, guitar.model, newStocks)))
           }
-
+        case FindGuitarsInStock(inStock, replyTo) =>
+          logger.info(s"[guitarDB] Find all guitars ${if(inStock) "in" else "out of"} stock.")
+          if(inStock) {
+            val resGuitars: Iterable[Guitar] = guitars.values.filter((_: Guitar).quantity > 0)
+            replyTo ! GuitarsInOrOutOfStock(resGuitars.toList)
+          }
+          else {
+            val resGuitars: Iterable[Guitar] = guitars.values.filter((_: Guitar).quantity == 0)
+            replyTo ! GuitarsInOrOutOfStock(resGuitars.toList)
+          }
+          Behaviors.same
       }
     }
 }
@@ -107,16 +122,13 @@ object LowLevelREST extends App with GuitarStoreJsonProtocol {
 
   import Messages._
 
-  trait RootCommand
-  case class RetrieveDBActor(replyTo: ActorRef[ActorRef[Command]]) extends RootCommand
-
-  val guitarList = List(
+  implicit val guitarList: List[Guitar] = List(
     Guitar("Fender", "Stratocaster"),
     Guitar("Gibson", "Les Paul"),
     Guitar("Martin", "LX1")
   )
 
-  val rootBehavior: Behavior[RootCommand] = Behaviors.setup { context: ActorContext[RootCommand] =>
+  implicit val rootBehavior: Behavior[RootCommand] = Behaviors.setup { context: ActorContext[RootCommand] =>
     val dbActor: ActorRef[Command] = context.spawn(GuitarDB(), "guitarDB")
     val responseHandler: ActorRef[Response] =
       context.spawn(Behaviors.receive[Response]{ (context: ActorContext[Response], message: Response) =>
@@ -134,6 +146,9 @@ object LowLevelREST extends App with GuitarStoreJsonProtocol {
             Behaviors.same
           case QuantityAdded(newStock) =>
             logger.info(s"[aggregator] Current stock is updated to: $newStock")
+            Behaviors.same
+          case GuitarsInOrOutOfStock(guitars) =>
+            logger.info(s"[aggregator] Guitars are found: $guitars")
             Behaviors.same
           case NoSuchGuitar =>
             logger.info(s"[aggregator] Guitar cannot be found.")
@@ -393,7 +408,7 @@ object LowLevelREST extends App with GuitarStoreJsonProtocol {
   /**
    * Initiate server
    */
-  val guitarDBActorFuture: Future[ActorRef[Command]] =
+  implicit val guitarDBActorFuture: Future[ActorRef[Command]] =
     system ? ((replyTo: ActorRef[ActorRef[Command]]) => RetrieveDBActor(replyTo))
   guitarDBActorFuture.onComplete {
     case Success(db) => startHttpServer(db)
