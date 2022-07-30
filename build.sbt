@@ -16,9 +16,9 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http"                % AkkaHttpVersion,
   "com.typesafe.akka" %% "akka-http-spray-json"     % AkkaHttpVersion,
   // testing
-  "com.typesafe.akka" %% "akka-stream-testkit"      % AkkaVersion      % Test,
-  "com.typesafe.akka" %% "akka-http-testkit"        % AkkaHttpVersion  % Test,
-  "com.typesafe.akka" %% "akka-actor-testkit-typed" % AkkaVersion      % Test,
+  "com.typesafe.akka" %% "akka-stream-testkit"      % AkkaVersion,
+  "com.typesafe.akka" %% "akka-http-testkit"        % AkkaHttpVersion,
+  "com.typesafe.akka" %% "akka-actor-testkit-typed" % AkkaVersion,
   "org.scalatest"     %% "scalatest"                % scalaTestVersion,
   // JWT
   "com.pauldijou"     %% "jwt-spray-json"           % "5.0.0",
