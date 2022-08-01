@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Websockets Demo</title>
+    <script>
+        let exampleSocket = new WebSocket("ws://localhost:8080/greeter");
+        console.log("Starting websocket...");
+
+        exampleSocket.onmessage = (event) => {
+            let newChild = document.createElement("div");
+            newChild.innerText = event.data;
+            document.getElementById("1").appendChild(newChild);
+        }
+
+        exampleSocket.onopen = (_) => {
+            exampleSocket.send("socket seems to be open...")
+        }
+
+        exampleSocket.send("socket says: hello, server!!!")
+    </script>
+</head>
+<body>
+    <h1>Starting websocket...</h1>
+    <div id="1">
+    </div>
+</body>
+</html>
